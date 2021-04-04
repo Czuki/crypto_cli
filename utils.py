@@ -6,160 +6,203 @@ import requests
 
 
 def get_response(url):
-    '''
+    """
     Connects to API with provided url
     and returns data in json format
+    raises exception if request fails
     :param url: external API url
     :return: response.json object
-    '''
+    """
     response = requests.get(url)
     if response.status_code != 200:
-        raise Exception(f'Request failed status code: {response.status_code}')
+        print(response.status_code)
+        return None
     return response.json()
 
 
 def create_parser():
     """
-    Function wraps parser object creation
-    and adds required arguments
+    creates parser object and adds required command line arguments
     :return: parser and args objects
     """
-    parser_ = argparse.ArgumentParser()
-    parser_.add_argument('-average-price-by-month', '-avg', help='average_price', action="store_true")
-    parser_.add_argument('-consecutive-increase', '-incr',  help='cons_incr', action="store_true")
-    parser_.add_argument('-export', '-exp', help='exp', action="store_true")
-    parser_.add_argument('--start-date', '--sdate',  help='start_date')
-    parser_.add_argument('--end-date', '--edate',  help='start_date')
-    parser_.add_argument('--format', '--f',  help='format')
-    parser_.add_argument('--file', help='file')
-    parser_.add_argument('--coin', help='coin')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-average-price-by-month', '-avg', help='average_price', action="store_true")
+    parser.add_argument('-consecutive-increase', '-incr', help='cons_incr', action="store_true")
+    parser.add_argument('-export', '-exp', help='exp', action="store_true")
+    parser.add_argument('--start-date', '--sdate', help='start_date')
+    parser.add_argument('--end-date', '--edate', help='start_date')
+    parser.add_argument('--format', '--f', help='format')
+    parser.add_argument('--file', help='file')
+    parser.add_argument('--coin', help='coin')
 
-    args_ = parser_.parse_args()
+    args = parser.parse_args()
 
-    return parser_, args_
+    return parser, args
 
 
 class CoinPaprikApi:
 
-    def __init__(self, start_date, end_date, coin='btc-bitcoin'):
+    def __init__(self, start_date, end_date, coin):
         self.start_date, self.end_date = self.check_date(start_date, end_date)
-        self.coin = coin
+        self.coin = coin if get_response(f'https://api.coinpaprika.com/v1/coins/{coin}') else 'btc-bitcoin'
 
     def __str__(self):
         return f'CoinPaprika Api {self.coin} data handler for period from {self.start_date} to {self.end_date}'
 
     @staticmethod
     def check_date(start, end):
-        '''
+        """
         Converts date to datetime format and validates the date
         if date is incorrect user will be asked to provide correct date
-        :param start: starting date
-        :param end: ending date
-        :return: start date and end date in datetime format
-        '''
+        if date is yyyy-mm we fix it to yyyy-mm-dd,
+        start_date day will be set to first day of a month and end_date day to last day of a month
+        :param start: str starting date 'yyyy-mm-dd' or 'yyyy-mm'
+        :param end: str ending date 'yyyy-mm-dd' or 'yyyy-mm'
+        :return: start_date: datetime.date object yyyy-mm-dd
+                 end_date: datetime.date object yyyy-mm-dd
+        """
         try:
             if len(start) == 7 and len(end) == 7:
-                start_date_parsed = datetime(int(start[:4]), int(start[5:]), 1).date()
-                end_date_parsed = datetime(int(end[:4]) + int(end[5:]) // 12, int(end[5:]) % 12 + 1, 1).date() - timedelta(days=1)
+                start_year = int(start[:4])
+                start_month = int(start[5:])
+                end_year = int(end[:4]) + int(end[5:]) // 12
+                end_month = int(end[5:]) % 12 + 1
+                start_date = datetime(start_year, start_month, 1).date()
+                end_date = datetime(end_year, end_month, 1).date() - timedelta(days=1)
             elif len(start) == 10 and len(end) == 10:
-                start_date_parsed = datetime.strptime(start, '%Y-%m-%d').date()
-                end_date_parsed = datetime.strptime(end, '%Y-%m-%d').date()
+                start_date = datetime.strptime(start, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end, '%Y-%m-%d').date()
             else:
                 raise ValueError('Date has incorrect format')
-            if start_date_parsed > end_date_parsed:
-                print('Start date cannot be before end date')
+
+            if start_date > end_date or end_date > datetime.now().date() or start_date > datetime.now().date():
                 raise ValueError
+
         except ValueError:
-            print('Date has incorrect format, please provide date in a yyyy-mm-dd format, or yyyy-mm')
+            print('Date has incorrect value, format or points to date in the future,'
+                  ' please provide correct date in a yyyy-mm-dd or yyyy-mm format')
             start = input('Starting date: ')
             end = input('Ending date: ')
-            start_date_parsed, end_date_parsed = CoinPaprikApi.check_date(start, end)
-        if end_date_parsed > datetime.now().date():
-            print('End date cannot be in the future, please invent time travel first.')
-            print('End date set for today')
-            end_date_parsed = datetime.now().date()
-        return start_date_parsed, end_date_parsed
+            start_date, end_date = CoinPaprikApi.check_date(start, end)
+
+        return start_date, end_date
 
     def get_average(self):
-        '''
-
-        :return:
-        '''
+        """
+        calculates average monthly prices of selected coin
+        for provided time period, minimal time period is 1 month
+        if date is provided with specific days,
+        start_date day is set to first day of month
+        end_date day is set to last day of month
+        :return: averages_for_months: {'yyyy-mm': average monthly price}
+        """
         start = datetime(self.start_date.year, self.start_date.month, 1).date()
-        end = datetime(self.end_date.year + self.end_date.month // 12, self.end_date.month % 12 + 1, 1).date() - timedelta(days=1)
-        print(f'Fetching average monthly prices for period from {start.year}-{start.month} to {end.year}-{end.month} please wait...')
+        end_year = self.end_date.year + self.end_date.month // 12
+        end_month = self.end_date.month % 12 + 1
+        end = datetime(end_year, end_month, 1).date() - timedelta(days=1)
+
+        print(f"Fetching average monthly prices for period from {start.strftime('%Y-%m')} to {end.strftime('%Y-%m')}")
+        print(f'Please wait...')
         averages_for_months = {}
         while True:
-            end_date_helper = datetime(start.year + start.month // 12, start.month % 12 + 1, 1).date() - timedelta(days=1)
-            url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={start}&end={end_date_helper}'
+            # set end_date day to last day of month
+            helper_year = start.year + start.month // 12
+            helper_month = start.month % 12 + 1
+            end_helper = datetime(helper_year, helper_month, 1).date() - timedelta(days=1)
+
+            url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={start}&end={end_helper}'
             month_values = [val['close'] for val in get_response(url)]
             if month_values:
                 averages_for_months[f"{start.strftime('%Y-%m')}"] = round(sum(month_values) / len(month_values), 2)
             else:
                 averages_for_months[f"{start.strftime('%Y-%m')}"] = 'No data for this month'
-            start = end_date_helper + timedelta(days=1)
-            if end_date_helper == end:
+            start = end_helper + timedelta(days=1)
+            if end_helper == end:
                 break
-        for month, value in averages_for_months.items():
-            print(f'{month} | {value}')
-
-        return averages_for_months  # dict of 'month' : avg_value
+        return averages_for_months
 
     def consecutive_increase(self):
-        if (self.end_date - self.start_date) > timedelta(days=364):
-            print('Provided dates cannot be more than 364 days apart')
-            return None
-        url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={self.start_date}&end={self.end_date}'
-        data = get_response(url)
-        arr = [round(val['close'],2) if val['close'] else 0 for val in data]
-        if arr == []:
-            print('No data for given period')
-            return None
+        """
+        finds longest consecutive period when price of coin was increasing
+        :return: date_from: datetime.date object
+                date_to: datetime.date object
+                diff: price difference
+        """
+        start_date = self.start_date
+        days_diff = (self.end_date - self.start_date).days  # total days to process, API has max limit of 1 year
+
+        response_data = []
+        while True:
+            limit = 366 if days_diff > 366 else days_diff
+            url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={start_date}&limit={limit}'
+            response_data = response_data + get_response(url)
+            start_date = start_date + timedelta(days=limit)
+            days_diff = days_diff - limit
+            if start_date >= self.end_date:
+                break
+        prices = [round(data['close'], 2) for data in response_data]
+
         i = 0
         counter = 0
         data_list = []
-        while i < len(arr):
-            if arr[i] <= arr[i + 1]:
+        while i < len(prices):
+            if prices[i] <= prices[i + 1]:
                 counter += 1
             else:
                 data_list.append((i, counter,))
                 counter = 1
             i += 1
-            if i + 1 == len(arr):
+            if i + 1 == len(prices):
                 data_list.append((i, counter,))
                 break
-        # # print(list(data_list))
-        # for ddd in data_list:
-        #     print(ddd)
+
         longest_sequence = sorted(data_list, key=lambda values: values[1], reverse=True)[0]
-        print(longest_sequence)
         sequence_start_index = longest_sequence[0] - longest_sequence[1] + 1
         sequence_end_index = longest_sequence[0]
-        diff = round(arr[sequence_end_index] - arr[sequence_start_index], 2)
+        diff = round(prices[sequence_end_index] - prices[sequence_start_index], 2)
+        date_from = response_data[sequence_start_index]['time_close'][:10]
+        date_to = response_data[sequence_end_index]['time_close'][:10]
 
-        date_from = data[sequence_start_index]['time_open'][:10]
-        date_to = data[sequence_end_index]['time_open'][:10]
-        print(f"Longest consecutive increase in value was from {date_from} to {date_to} with increase of {diff}$")
-        return arr[sequence_start_index:sequence_end_index] #array with increasing values sequence
+        return date_from, date_to, diff
 
-    def data_export(self, format_choice, file_name):
-        url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={self.start_date}&end={self.end_date}'
-        data = get_response(url)
+    def data_export(self, file_name, format_choice):
+        """
+        :param format_choice: string
+        :param file_name: string
+        :return: creates file and prints message
+        """
+
+        format_choice = 'csv' if not format_choice else format_choice
+        file_name = f'{self.coin}_data.{format_choice}' if not file_name else file_name
+
+        start_date = self.start_date
+        days_diff = (self.end_date - self.start_date).days  # total days to process, API has max limit of 1 year
+        response_data = []
+        while True:
+            limit = 366 if days_diff > 366 else days_diff
+            url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={start_date}&limit={limit}'
+            response_data = response_data + get_response(url)
+            start_date = start_date + timedelta(days=limit)
+            days_diff = days_diff - limit
+            if start_date >= self.end_date:
+                break
+
+        # url = f'https://api.coinpaprika.com/v1/coins/{self.coin}/ohlcv/historical?start={self.start_date}&end={self.end_date}'
+        # data = get_response(url)
         if format_choice == 'csv':
-
             with open(file_name, mode='w') as csv_file:
                 export_writer = csv.writer(csv_file, delimiter=',')
                 export_writer.writerow(['Date', 'Price'])
-                for d in data:
+                for d in response_data:
                     date = d['time_open'][:10]
                     price = round(d['close'], 2)
                     export_writer.writerow([date, price])
-                print('Data succesfully imported to CSV file')
+                print('Data successfully exported to CSV file')
 
         elif format_choice == 'json':
             with open(file_name, mode='w') as json_file:
                 json_data_list = []
-                for d in data:
+                for d in response_data:
                     date = d['time_open'][:10]
                     price = round(d['close'], 2)
                     json_data = {
@@ -168,4 +211,4 @@ class CoinPaprikApi:
                     }
                     json_data_list.append(json_data)
                 json.dump(json_data_list, json_file, indent=4)
-                print('Data succesfully imported to JSON file')
+                print('Data successfully exported to JSON file')
