@@ -53,9 +53,8 @@ default is csv if not provided
 
 --file=name_of_file.csv
 defaults to '(coin_name)_data .(format)' if not provided
-Required arguments:
 ```
-
+Required arguments:
 ```
 --start-date=yyyy-mm-dd or yyyy-mm
 --end-date=yyyy-mm-dd or yyyy-mm
