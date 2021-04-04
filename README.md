@@ -1,5 +1,5 @@
 # ProfilSoftwareRecrTask
-Recruitmnent task for ProfiSoftware Internship
+Recruitment task for ProfiSoftware Internship
 
 # Usage
 
