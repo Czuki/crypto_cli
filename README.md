@@ -9,15 +9,18 @@ python3 script.py -h
 or
 python3 script.py
 ```
+Show average monthly prices for selected coin in a given time period
 ```
 -average-price-by-month
 -avg 
 ```
-Shows average monthly prices for selected coin in a given time period
 Use example:
 ```
 python3 script.py -average-price-by-month --start-date=2020-10-10 --end-date=2020-12-12 --coin=btc-bitcoin
 ```
+
+
+Show longest consecutive price increase in given time period
 ```
 -consecutive-increase
 -incr
