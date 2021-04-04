@@ -16,7 +16,7 @@ def get_response(url):
     :return: response.json object
     """
     response = requests.get(url)
-    requests_cache.install_cache(cache_name='coin_cache', backend='sqlite', expire_after=180)
+    requests_cache.install_cache(cache_name='coin_cache', backend='sqlite', expire_after=360)
     if response.status_code != 200:
         print(response.status_code)
         return None
