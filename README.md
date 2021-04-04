@@ -1,6 +1,14 @@
 # ProfilSoftwareRecrTask
 Recruitment task for ProfilSoftware Internship
 
+<<<<<<< Updated upstream
+=======
+Script for processing data from external API about cryptocurrencies.
+Shows monthly average prices and longest consecutive price increase
+
+Caching mechanism implemented with requests-cache and sqlite database
+
+>>>>>>> Stashed changes
 # Usage
 
 To see help and usage in console:
