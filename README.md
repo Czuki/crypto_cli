@@ -1,5 +1,3 @@
-# ProfilSoftwareRecrTask
-Recruitment task for ProfilSoftware Internship
 
 Script for processing data from external API about cryptocurrencies.
 Shows monthly average prices and longest consecutive price increase
